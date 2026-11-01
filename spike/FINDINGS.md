@@ -37,7 +37,7 @@ Raw logs: `spike/logs/run-*.json`.
 
 ## Runs 3–5: new player each phase vs one player that swaps videos
 
-The spike's Player setting picks the mode. Recreate = PLAN.md today (destroy the player, create a new one, seek, play). Reuse = one player for the whole workout; each phase calls `loadVideoById({ videoId, startSeconds })`, and the player is destroyed only on Stop or Finished. Runs 3 and 4 used the same fixture and timing (skip after 6 s), with a warm cache.
+The spike's Player setting picks the mode. Recreate = the earlier PLAN.md (destroy the player, create a new one, seek, play). Reuse = one player for the whole workout; each phase calls `loadVideoById({ videoId, startSeconds })`, and the player is destroyed only on Stop or Finished. Runs 3 and 4 used the same fixture and timing (skip after 6 s), with a warm cache.
 
 | | Recreate (run 4) | Reuse (run 3) |
 | --- | --- | --- |
@@ -66,7 +66,7 @@ Takeaways:
 1. **Streaming works in principle.** Embed, seek, cut, destroy/recreate, pause, skip and error handling all behave as the plan assumes.
 2. **Every phase starts with ~0.3–2 s of black and silence** (3.5 s on a cold first load). **Decided 2026-11-01: one player per session** (reuse mode), chosen for simplicity. PLAN.md's Clock and video section now says so. The TV run should still confirm it.
 3. **Error codes:** a bad id came back as 150, not 100. The plan already treats any `onError` as clip failed, so no change is needed. Tests shouldn't expect a specific code.
-4. **A clip that ends early leaves YouTube's end screen up**, and its suggestions can be clicked. The plan says only that `ENDED` doesn't end the phase. **Decided 2026-11-01: a clip-ended panel covers the video region** until the phase ends (PLAN.md Clock and video, DESIGN.md Overlays).
+4. **A clip that ends early leaves YouTube's end screen up**, and its suggestions can be clicked. The plan says only that `ENDED` doesn't end the phase. **Decided 2026-11-01:** the clip is cued back to its start (a still frame) and the caption says it ended. An earlier idea of covering the player with a panel was dropped because YouTube's rules forbid drawing over an embedded player (REVIEW.md decision 1).
 5. **Not tested yet, and these are the real risks:** the TV browser's autoplay policy (the tap prompt), fullscreen and wake lock, ads before a clip, the audio at a phase boundary (can't hear it from here), and screen sleep. These need the run on the TV.
 
 ## Running it on the TV

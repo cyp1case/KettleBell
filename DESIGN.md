@@ -61,8 +61,8 @@ Reference frame 1920×1080. Scale proportionally to the TV's viewport (size from
 
 - 32px outer padding, 28px gap between the status bar and the body.
 - **Status bar:** full width, 156px tall, Carbon, three equal slots separated by Line dividers, 40px side padding. Slots left to right: exercise slot (label Now, Last, or Now with an em dash value), Up next, Circuit. No fourth slot.
-- **Video region:** left and center. The YouTube iframe is 16:9 (1352×760 at 1080p), centered, 18px radius. Nothing overlaps it.
-- **Caption:** directly under the iframe, left aligned to it: a 12px dot in the phase color, then the exercise whose clip is on screen.
+- **Video region:** left and center. The YouTube iframe is 16:9 (1352×760 at 1080p), centered, 18px radius. Nothing is drawn over it or inside its rectangle, ever (YouTube's rules).
+- **Caption:** directly under the iframe, left aligned to it: a 12px dot in the phase color, then the exercise whose clip is on screen, then the video state if there is one (see Video states).
 - **Rail:** right column 360px wide, 32px from the video region, Carbon, 22px radius. Top to bottom: phase label, digits `M:SS`, then the column. The column is 132px wide, fills the remaining height, Graphite track, phase-color fill anchored to the bottom, height = remaining ÷ phase duration.
 
 ### Phase colors
@@ -77,7 +77,7 @@ Up next and Circuit values are always Chalk.
 
 ### Screens (canvas boards in flow order)
 
-1. **Ready** — no status bar, no rail. Centered: kettlebell line icon in Ion, "READY" 220px in Ion with glow.
+1. **Ready** — no status bar, no rail. Centered: kettlebell line icon in Ion, "READY" 220px in Ion with glow. Only when the TV's sound method is press-on-ready and no key has been pressed yet, one focused button under it: speaker icon, "PRESS OK TO ENABLE SOUND", Condensed 800 48px, Graphite fill, 2px Ion border while focused, 16px radius. It disappears after the press.
 2. **Next (intro)** — Now —, Up next Swing, Circuit A 1 of 2. Swing how-to in the video. Rail: Next, Ion.
 3. **Work** — Now Swing (Volt), Up next Squat, Circuit A 1 of 2. Swing song. Rail: Work, Volt.
 4. **Rest between passes** — Last Squat, Up next Swing, Circuit A 2 of 2. Swing how-to. Rail: Rest, Ion.
@@ -85,13 +85,13 @@ Up next and Circuit values are always Chalk.
 
 Labels for every phase must match the normative timeline in `PLAN.md`.
 
-### Overlays (inside the video region only)
+### Video states (in the caption line, never over the video)
 
-The status bar and rail keep running underneath all three.
+The caption keeps the exercise name and adds the state after a Line-colored divider, same 36px Condensed 700 uppercase. The video itself shows whatever YouTube shows (playing, or the cued still frame).
 
-- **Tap once to allow sound** — the video region gets a 1.5px Ion border. Centered: speaker icon in Ion (110px), "TAP ONCE TO ALLOW SOUND" Condensed 800 72px in Chalk.
-- **Clip ended** — the panel fully covers the iframe: Carbon fill, no border change, nothing from YouTube shows through. Centered: the exercise name Condensed 800 72px in Chalk, uppercase. No icon, no helper line.
-- **Clip failed** — the video region gets a 2px Pulse border. Centered: alert-circle icon in Pulse, "CLIP FAILED" Condensed 800 72px in Pulse.
+- **Press OK for sound** — speaker icon and "PRESS OK FOR SOUND" in Ion.
+- **Clip ended** — "CLIP ENDED" in Mist. The video shows the clip's cued still frame.
+- **Clip failed** — alert-circle icon and "CLIP FAILED" in Pulse.
 
 ## Editor — `/editor`
 
@@ -99,9 +99,13 @@ Computer browser only. No phone layout. Fluid page, content max width 1400px, 32
 
 ### Frame
 
-- **Top bar:** kettlebell icon in Volt, "KETTLEBELL EDITOR" (Editor in Mist). Right: the TV status pill.
-  - TV ready: Carbon pill, Line border, Ion dot, "TV ready".
-  - Running: Volt border, Volt dot with glow, "Running on TV" in Volt.
+- **Top bar:** kettlebell icon in Volt, "KETTLEBELL EDITOR" (Editor in Mist). Right: the TV status pill. Pill text comes from `PLAN.md` Editor page.
+  - TV ready: Carbon pill, Line border, Ion dot.
+  - TV needs a press: Carbon pill, Ion border, Ion speaker icon.
+  - Running on TV: Volt border, Volt dot with glow, text in Volt.
+  - Paused on TV: Volt border, hollow Volt dot, no glow, text in Chalk.
+  - Finished on TV: Line border, Volt check icon.
+  - TV not connected: Line border, Mist dot, text in Mist.
 - **Sidebar:** 200px. How-tos, Songs, Exercises, Circuits, Workouts as 48px nav items. Current item: Graphite fill with a 3px Volt bar on its left edge.
 
 ### Workouts page
@@ -110,16 +114,16 @@ Two columns under the page title: a compact list on the left (about 340–440px)
 
 - **List rows** stay short no matter how big a workout is. Each row: the name, the block sequence as chips (`A × 2`, `B × 1`, `A × 2`), and its **Start on TV** button on the row. Clicking the row selects it. Selected row: Graphite fill and a 1.5px Volt border.
 - **Detail panel:** Carbon, 20px radius. Header: name, the block sequence as chips after the label "Runs", and an Edit button. Then each circuit in the workout once, in first-appearance order: "Circuit A", exercise count, "Rest 0:20" in Ion. Under it, its slots as a wrapping grid of tiles (min 150px wide): slot number in Mist, exercise name, work time in Volt. The panel scrolls inside itself (max height about 44rem) instead of growing the page.
-- **Start on TV:** Volt fill, Void text. Disabled: Carbon fill, Line border, Mist text, with the reason in Mist ("A session is already on the TV").
+- **Start on TV:** Volt fill, Void text. Disabled: Carbon fill, Line border, Mist text, with the reason in Mist, word for word from `PLAN.md` (for example "A session is already on the TV.").
 - **+ New** button beside the title: Graphite, Line border.
 
 ### While running
 
-Above the two columns, a session panel: Carbon with a 1.5px Volt border and a soft Volt glow. Left: "On the TV now" label, the workout name 48px in Volt, its block chips, one line in Mist. Right: **Pause** (Graphite, 72px tall), **Skip** (Ion outline), **Stop** (Pulse outline). The editor shows no countdown and no current exercise, because the player reports only ready, running or finished. All Start buttons are disabled; editing stays available.
+Above the two columns, a session panel: Carbon with a 1.5px Volt border and a soft Volt glow. Left: "On the TV now" label, the workout name 48px in Volt, its block chips. Right: **Pause** or **Resume** (Graphite, 72px tall; the TV reports which), **Skip** (Ion outline), **Stop** (Pulse outline). The editor shows no countdown and no current exercise. All Start buttons are disabled; editing stays available.
 
 ### Not yet mocked
 
-How-tos page (start and stop times), Songs page, Exercises page (picking a how-to and a song), Circuits page (slots, reordering, rest), delete confirmations, the editor's Finished state with Done, and refused-save messages. Use the tokens above for them.
+How-tos page (start and stop times, Test play with a small embedded player that nothing covers), Songs page (Test play), Exercises page (picking a how-to and a song), Circuits page (slots, reordering, rest), delete confirmations, the editor's Finished state with Done, and refused-save messages. Use the tokens above for them.
 
 ## Open questions for the owner
 
@@ -127,7 +131,7 @@ Each needs a decision before the phase that builds it. Until decided, follow `PL
 
 1. **Helper lines.** The mockups add short Mist lines that `PLAN.md` does not specify: Ready ("Start a workout from the editor on your computer."), Finished ("Press Done in the editor to return to Ready."), and one line under each overlay. Keep or remove? **Decided: removed.** No helper lines on the TV.
 2. **Paused look on the TV.** `PLAN.md` only freezes the rail. A frozen rail can look like a hang. Add a "Paused" label in the rail?
-3. **Pause or Resume in the editor.** The player reports only ready, running, finished, so the editor cannot know the session is paused. Proposed: add `paused` to what the player reports.
-4. **Circuit naming.** The fixture circuit has no name; the mockups call it A.
-5. **Fresh heartbeat.** `PLAN.md` says "a few seconds". Pick a number.
+3. **Pause or Resume in the editor.** **Decided:** the heartbeat reports paused, and the editor shows Pause or Resume to match.
+4. **Circuit naming.** **Decided:** the fixture circuit is A.
+5. **Fresh heartbeat.** **Decided:** 5 seconds by the server clock.
 6. **Reserved colors.** Flare and Ember are unused until someone assigns them (for example Flare for clip failed and Ember for warnings, freeing Pulse).
