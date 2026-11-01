@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kettlebell playback spike</title>
+<style>
+  :root {
+    --void: #08090B; --carbon: #121418; --graphite: #1C1F25; --line: #2A2F37;
+    --mist: #9AA3AF; --chalk: #F2F4F7; --volt: #C8FF2E; --ion: #2EE6FF; --pulse: #FF3DCB;
+    --phase: var(--ion);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--void); color: var(--chalk); font: 15px/1.4 system-ui, sans-serif; }
+  button { font: 700 16px 'Arial Narrow', system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase;
+    min-height: 44px; padding: 0 18px; border-radius: 12px; border: 1px solid var(--line); background: var(--graphite); color: var(--chalk); cursor: pointer; }
+  button:focus-visible { outline: 3px solid var(--ion); }
+  button.go { background: var(--volt); color: var(--void); border-color: var(--volt); }
+  input, select, textarea { background: var(--graphite); color: var(--chalk); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font: inherit; }
+  label { display: grid; gap: 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .1em; color: var(--mist); }
+
+  /* setup */
+  #setup { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+  #setup h1 { font: 800 30px 'Arial Narrow', sans-serif; text-transform: uppercase; margin: 0 0 4px; }
+  #setup p { color: var(--mist); margin: 0 0 16px; }
+  .ex { background: var(--carbon); border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-bottom: 12px;
+    display: grid; grid-template-columns: 1fr 3fr 90px 3fr 90px 90px; gap: 10px; align-items: end; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin: 12px 0; }
+  .row label { min-width: 120px; }
+  .check { flex-direction: row; display: flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--chalk); }
+  @media (max-width: 800px) { .ex { grid-template-columns: 1fr 1fr; } }
+
+  /* stage */
+  #stage { display: none; height: 100vh; padding: 1.7vw; gap: 1.5vw; flex-direction: column; }
+  #stage.on { display: flex; }
+  #bar { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--carbon); border-radius: 22px; height: 14.4vh; flex: none; }
+  #bar > div { padding: 0 2vw; display: flex; flex-direction: column; justify-content: center; border-left: 1px solid var(--line); min-width: 0; }
+  #bar > div:first-child { border-left: 0; }
+  .lbl { font-weight: 600; font-size: 2.2vh; letter-spacing: .14em; text-transform: uppercase; color: var(--mist); }
+  .val { font: 800 5.9vh 'Arial Narrow', sans-serif; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #body { flex: 1; display: flex; gap: 1.7vw; min-height: 0; }
+  #videoCol { flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
+  #video { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 100%; border-radius: 18px; overflow: hidden; background: #000; border: 2px solid transparent; }
+  #video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  #video.failed { border-color: var(--pulse); }
+  #video.tap { border-color: var(--ion); }
+  .overlay { position: absolute; inset: 0; display: none; place-items: center; text-align: center; background: rgba(8,9,11,.82); z-index: 2; }
+  .overlay.on { display: grid; }
+  .overlay b { font: 800 6.6vh 'Arial Narrow', sans-serif; text-transform: uppercase; display: block; }
+  #caption { margin-top: 1.2vh; font: 700 3.3vh 'Arial Narrow', sans-serif; text-transform: uppercase; display: flex; gap: 12px; align-items: center; }
+  #caption i { width: 12px; height: 12px; border-radius: 50%; background: var(--phase); display: inline-block; }
+  #rail { width: 18.75vw; flex: none; background: var(--carbon); border-radius: 22px; padding: 3vh 0; display: flex; flex-direction: column; align-items: center; gap: 1vh; }
+  #railLbl { font-weight: 700; font-size: 2.8vh; letter-spacing: .18em; text-transform: uppercase; color: var(--phase); }
+  #digits { font: 800 13.9vh/1 'Arial Narrow', sans-serif; font-variant-numeric: tabular-nums; }
+  #col { flex: 1; width: 6.9vw; background: var(--graphite); border-radius: 16px; position: relative; overflow: hidden; }
+  #fill { position: absolute; left: 0; right: 0; bottom: 0; background: var(--phase); }
+  .work #fill, .work #nowVal { box-shadow: 0 0 30px rgba(200,255,46,.4); }
+  .work #nowVal { color: var(--volt); text-shadow: 0 0 28px rgba(200,255,46,.4); }
+
+  #center { display: none; flex: 1; place-items: center; text-align: center; }
+  #center.on { display: grid; }
+  #center b { font: 800 20vh 'Arial Narrow', sans-serif; text-transform: uppercase; color: var(--volt); text-shadow: 0 0 34px rgba(200,255,46,.4); display: block; line-height: 1; }
+
+  #controls { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); display: none; gap: 8px; z-index: 5;
+    background: rgba(18,20,24,.92); padding: 8px; border-radius: 16px; border: 1px solid var(--line); }
+  #stage.on ~ #controls { display: flex; }
+  #log { position: fixed; right: 10px; top: 10px; width: 460px; max-height: 45vh; overflow: auto; display: none; z-index: 6;
+    background: rgba(8,9,11,.94); border: 1px solid var(--line); border-radius: 12px; padding: 8px; font: 12px/1.35 ui-monospace, Consolas, monospace; white-space: pre-wrap; }
+  #log.on { display: block; }
+</style>
+</head>
+<body>
+
+<section id="setup">
+  <h1>Playback spike</h1>
+  <p>Runs the PLAN.md fixture with real YouTube clips: how-to on Next and Rest, song on Work, the page clock cuts each clip. Every event is logged and saved to <code>spike/logs/</code>.</p>
+
+  <div id="exList"></div>
+
+  <div class="row">
+    <label>Rest (s)<input id="rest" type="number" min="1" value="20"></label>
+    <label>Passes<input id="passes" type="number" min="1" value="2"></label>
+    <label>Start time via
+      <select id="method">
+        <option value="seekTo">seekTo() on ready</option>
+        <option value="playerVar">playerVars.start</option>
+      </select>
+    </label>
+    <label>Player
+      <select id="playerMode">
+        <option value="recreate">New player each phase</option>
+        <option value="reuse">One player, swap video</option>
+      </select>
+    </label>
+    <label class="check"><input id="badId" type="checkbox"> Replace exercise 2's how-to with a bad video id</label>
+  </div>
+  <div class="row">
+    <label style="flex:1">Notes for this run (saved with the log)<textarea id="notes" rows="2"></textarea></label>
+  </div>
+  <div class="row">
+    <button class="go" id="startBtn">Start</button>
+    <button id="saveCfg">Save for the TV</button>
+    <span id="cfgMsg" style="color:var(--mist)"></span>
+  </div>
+  <p>On the TV open <code>/?tv</code> (waits for a press) or <code>/?tv=auto</code> (starts by itself after 10 s, like the editor starting it, with no tap).</p>
+</section>
+
+<section id="stage">
+  <div id="bar">
+    <div><span class="lbl" id="nowLbl">Now</span><span class="val" id="nowVal">—</span></div>
+    <div><span class="lbl">Up next</span><span class="val" id="nextVal"></span></div>
+    <div><span class="lbl">Circuit</span><span class="val" id="circVal"></span></div>
+  </div>
+  <div id="body">
+    <div id="videoCol">
+      <div id="video">
+        <div id="slot"></div>
+        <div class="overlay" id="tapOv"><div><b>Tap once to allow sound</b></div></div>
+        <div class="overlay" id="failOv"><div><b style="color:var(--pulse)">Clip failed</b><span id="failWhy" style="color:var(--mist)"></span></div></div>
+      </div>
+      <div id="caption"><i></i><span id="capText"></span></div>
+    </div>
+    <div id="rail">
+      <div id="railLbl">Next</div>
+      <div id="digits">0:00</div>
+      <div id="col"><div id="fill"></div></div>
+    </div>
+  </div>
+  <div id="center"><div><b id="centerHead">Ready</b><div id="centerSub" style="font:700 6.6vh 'Arial Narrow',sans-serif;text-transform:uppercase"></div></div></div>
+</section>
+
+<div id="controls">
+  <button id="pauseBtn">Pause</button>
+  <button id="skipBtn">Skip</button>
+  <button id="stopBtn">Stop</button>
+  <button id="markBtn" title="Logs a timestamp: use it when you hear or see something">Mark</button>
+  <button id="logBtn">Log</button>
+</div>
+<pre id="log"></pre>
+
+<script>
+const $ = id => document.getElementById(id);
+const EX_DEFAULT = [
+  { name: 'Swing', howto: '', howtoStart: 0, song: '', songStart: 30, work: 30 },
+  { name: 'Squat', howto: '', howtoStart: 0, song: '', songStart: 30, work: 60 },
+];
+const BAD_ID = 'zzzzzzzzzzz';
+
+// ---------- setup form ----------
+function exRow(e, i) {
+  return `<div class="ex" data-i="${i}">
+    <label>Exercise ${i + 1}<input name="name" value="${e.name}"></label>
+    <label>How-to URL<input name="howto" value="${e.howto}"></label>
+    <label>Start (s)<input name="howtoStart" type="number" min="0" value="${e.howtoStart}"></label>
+    <label>Song URL<input name="song" value="${e.song}"></label>
+    <label>Start (s)<input name="songStart" type="number" min="0" value="${e.songStart}"></label>
+    <label>Work (s)<input name="work" type="number" min="1" value="${e.work}"></label>
+  </div>`;
+}
+function readForm() {
+  const ex = [...document.querySelectorAll('.ex')].map(row => {
+    const v = n => row.querySelector(`[name=${n}]`).value.trim();
+    return { name: v('name'), howto: v('howto'), howtoStart: +v('howtoStart') || 0, song: v('song'), songStart: +v('songStart') || 0, work: Math.max(1, +v('work') || 1) };
+  });
+  return { ex, rest: Math.max(1, +$('rest').value || 1), passes: Math.max(1, +$('passes').value || 1),
+    method: $('method').value, playerMode: $('playerMode').value, badId: $('badId').checked, notes: $('notes').value };
+}
+function fillForm(cfg) {
+  $('exList').innerHTML = (cfg.ex || EX_DEFAULT).map(exRow).join('');
+  if (cfg.rest) $('rest').value = cfg.rest;
+  if (cfg.passes) $('passes').value = cfg.passes;
+  if (cfg.method) $('method').value = cfg.method;
+  if (cfg.playerMode) $('playerMode').value = cfg.playerMode;
+  $('badId').checked = !!cfg.badId;
+  // Prefill start time from ?t= / &start= when a URL is pasted, as PLAN.md asks.
+  document.querySelectorAll('.ex input[name=howto], .ex input[name=song]').forEach(inp => inp.addEventListener('change', () => {
+    const t = parseStart(inp.value);
+    if (t != null) inp.parentElement.nextElementSibling.querySelector('input').value = t;
+  }));
+}
+function parseId(url) {
+  try {
+    const u = new URL(url);
+    if (u.hostname.endsWith('youtu.be')) return u.pathname.slice(1, 12) || null;
+    if (u.searchParams.get('v')) return u.searchParams.get('v');
+    const m = u.pathname.match(/\/(embed|shorts|live)\/([\w-]{11})/);
+    return m ? m[2] : null;
+  } catch { return null; }
+}
+function parseStart(url) {
+  try {
+    const u = new URL(url);
+    const t = u.searchParams.get('t') || u.searchParams.get('start');
+    if (!t) return null;
+    if (/^\d+s?$/.test(t)) return parseInt(t, 10);
+    const m = t.match(/(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?/);
+    return (+m[1] || 0) * 3600 + (+m[2] || 0) * 60 + (+m[3] || 0);
+  } catch { return null; }
+}
+
+// ---------- log ----------
+let log = [], t0 = 0, runMeta = {};
+function L(type, data = {}) {
+  const e = { t: Math.round(performance.now() - t0), phase: S?.phase?.id ?? null, type, ...data };
+  log.push(e);
+  $('log').textContent += `${(e.t / 1000).toFixed(2).padStart(7)} #${e.phase ?? '-'} ${type} ${Object.keys(data).length ? JSON.stringify(data) : ''}\n`;
+  $('log').scrollTop = 1e9;
+}
+async function saveLog(reason) {
+  const body = JSON.stringify({ reason, meta: runMeta, summary: summarize(), events: log });
+  try { const r = await fetch('/log', { method: 'POST', body }); L('log saved', { file: await r.text() }); }
+  catch (err) { L('log save failed', { err: String(err) }); }
+}
+function summarize() {
+  const phases = log.filter(e => e.type === 'phase enter');
+  const by = id => log.filter(e => e.phase === id);
+  return phases.map(p => {
+    const ev = by(p.phase);
+    const playing = ev.find(e => e.type === 'state' && e.state === 'PLAYING');
+    const pos = ev.find(e => e.type === 'position check');
+    return {
+      phase: p.phase, kind: p.kind, clip: p.clip, startAt: p.start,
+      error: ev.find(e => e.type === 'yt error')?.code ?? null,
+      msToPlaying: playing ? playing.t - p.t : null,
+      landedAt: pos?.current ?? null,
+      seekOk: pos ? Math.abs(pos.current - pos.expected) < 3 : null,
+      endedEarly: ev.some(e => e.type === 'state' && e.state === 'ENDED'),
+      iframes: ev.find(e => e.type === 'player created' || e.type === 'load into existing player')?.iframes ?? null,
+      autoplayBlocked: ev.some(e => e.type === 'autoplay blocked'),
+    };
+  });
+}
+
+// ---------- session ----------
+let S = null, ticker = null, player = null, nextPhaseId = 1;
+const YT_STATE = { '-1': 'UNSTARTED', 0: 'ENDED', 1: 'PLAYING', 2: 'PAUSED', 3: 'BUFFERING', 5: 'CUED' };
+
+function buildPhases(cfg) {
+  // Flattened fixture: intro, then work/rest per slot, no rest after the last work.
+  const out = [], ex = cfg.ex, n = ex.length;
+  const howtoId = i => (cfg.badId && i === 1) ? BAD_ID : parseId(ex[i].howto);
+  const songId = i => parseId(ex[i].song);
+  out.push({ kind: 'intro', pass: 0, slot: 0, dur: cfg.rest, clip: howtoId(0), start: ex[0].howtoStart, clipOf: 0 });
+  for (let p = 0; p < cfg.passes; p++) {
+    for (let s = 0; s < n; s++) {
+      out.push({ kind: 'work', pass: p, slot: s, dur: ex[s].work, clip: songId(s), start: ex[s].songStart, clipOf: s });
+      const last = s === n - 1, lastPass = p === cfg.passes - 1;
+      if (last && lastPass) break;
+      const np = last ? p + 1 : p, ns = last ? 0 : s + 1;
+      out.push({ kind: 'rest', pass: np, slot: ns, dur: cfg.rest, clip: howtoId(ns), start: ex[ns].howtoStart, clipOf: ns, last: s });
+    }
+  }
+  return out;
+}
+
+function start(cfg) {
+  const missing = cfg.ex.flatMap((e, i) => [!parseId(e.howto) && `exercise ${i + 1} how-to`, !parseId(e.song) && `exercise ${i + 1} song`]).filter(Boolean);
+  if (missing.length) { alert('These URLs do not give a video id: ' + missing.join(', ')); return; }
+  log = []; $('log').textContent = ''; t0 = performance.now(); nextPhaseId = 1;
+  runMeta = { cfg, startedAt: new Date().toISOString(), hadGesture: hadGesture(), viewport: `${innerWidth}x${innerHeight}` };
+  S = { cfg, phases: buildPhases(cfg), idx: -1, phase: null, done: new Set() };
+  $('setup').style.display = 'none'; $('stage').classList.add('on');
+  L('session start', { hadGesture: hadGesture(), method: cfg.method });
+  enter(0);
+  ticker = setInterval(tick, 100);
+}
+
+function enter(idx) {
+  if (S.cfg.playerMode !== 'reuse' || !S.phases[idx]) teardownPlayer();
+  S.idx = idx;
+  const ph = S.phases[idx];
+  if (!ph) return finish();
+  S.phase = { ...ph, id: nextPhaseId++, endAt: performance.now() + ph.dur * 1000, paused: false, remaining: ph.dur * 1000, failed: false, gotPlaying: false };
+  L('phase enter', { kind: ph.kind, clip: ph.clip, start: ph.start, dur: ph.dur });
+  render();
+  if (S.cfg.playerMode === 'reuse' && player) { if (player.ready) loadInto(S.phase); }  // still loading: onReady catches up
+  else createPlayer();
+}
+
+function complete(id, how) {
+  // Double-advance guard: a phase id completes once, whether by clock or skip.
+  if (!S || S.done.has(id) || S.phase?.id !== id) { L('completion ignored', { id, how }); return; }
+  S.done.add(id);
+  L('phase complete', { how });
+  enter(S.idx + 1);
+}
+
+function tick() {
+  if (!S?.phase || S.phase.paused) return;
+  const left = S.phase.endAt - performance.now();
+  if (left <= 0) return complete(S.phase.id, 'clock');
+  S.phase.remaining = left;
+  paintClock();
+}
+
+function paintClock() {
+  const ph = S.phase, secs = Math.ceil(ph.remaining / 1000);
+  $('digits').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+  $('fill').style.height = `${Math.max(0, ph.remaining / (ph.dur * 1000)) * 100}%`;
+}
+
+function render() {
+  const ph = S.phase, ex = S.cfg.ex, n = ex.length, passes = S.cfg.passes;
+  const color = ph.kind === 'work' ? 'var(--volt)' : 'var(--ion)';
+  document.documentElement.style.setProperty('--phase', color);
+  $('stage').classList.toggle('work', ph.kind === 'work');
+  $('nowLbl').textContent = ph.kind === 'rest' ? 'Last' : 'Now';
+  $('nowVal').textContent = ph.kind === 'intro' ? '—' : ph.kind === 'rest' ? ex[ph.last].name : ex[ph.slot].name;
+  $('nowVal').style.color = ph.kind === 'intro' ? 'var(--mist)' : '';
+  let next;
+  if (ph.kind === 'work') next = ph.slot < n - 1 ? ex[ph.slot + 1].name : ph.pass < passes - 1 ? ex[0].name : 'Finish';
+  else next = ex[ph.slot].name;
+  $('nextVal').textContent = next;
+  $('circVal').textContent = `A ${ph.pass + 1} of ${passes}`;
+  $('railLbl').textContent = { intro: 'Next', work: 'Work', rest: 'Rest' }[ph.kind];
+  $('capText').textContent = ex[ph.clipOf].name;
+  $('failOv').classList.remove('on'); $('video').classList.remove('failed');
+  paintClock();
+}
+
+function finish() {
+  clearInterval(ticker); teardownPlayer();
+  L('finished');
+  S.phase = null;
+  $('bar').style.display = 'none'; $('body').style.display = 'none';
+  $('centerHead').textContent = 'Finished'; $('centerSub').textContent = 'Spike workout';
+  $('center').classList.add('on');
+  saveLog('finished');
+}
+
+function stop() {
+  if (!S) return;
+  clearInterval(ticker); teardownPlayer();
+  L('stopped');
+  saveLog('stopped');
+  S = null;
+  $('stage').classList.remove('on'); $('setup').style.display = '';
+  $('bar').style.display = ''; $('body').style.display = ''; $('center').classList.remove('on');
+}
+
+function pauseResume() {
+  const ph = S?.phase; if (!ph) return;
+  if (!ph.paused) {
+    ph.paused = true; ph.remaining = Math.max(0, ph.endAt - performance.now());
+    try { player?.pauseVideo(); } catch {}
+    L('pause', { remaining: Math.round(ph.remaining) });
+    $('pauseBtn').textContent = 'Resume';
+  } else {
+    ph.paused = false; ph.endAt = performance.now() + ph.remaining;
+    L('resume', { remaining: Math.round(ph.remaining) });
+    $('pauseBtn').textContent = 'Pause';
+    if (!ph.failed && player) {
+      try { player.playVideo(); } catch {}
+      const id = ph.id;
+      setTimeout(() => {
+        if (S?.phase?.id === id && !S.phase.paused && player?.getPlayerState?.() !== 1) markFailed('did not resume');
+      }, 2500);
+    }
+  }
+}
+
+// ---------- YouTube ----------
+let ytReady;
+const ytLoaded = new Promise(r => (ytReady = r));
+window.onYouTubeIframeAPIReady = () => ytReady();
+
+function hadGesture() { return navigator.userActivation ? navigator.userActivation.hasBeenActive : gestureSeen; }
+let gestureSeen = false;
+addEventListener('pointerdown', () => (gestureSeen = true), { capture: true });
+addEventListener('keydown', () => (gestureSeen = true), { capture: true });
+
+// The phase an event belongs to, or null when it is a late event from a clip we already left.
+function eventPhase(kind) {
+  const ph = S?.phase;
+  if (!ph || !player || player.phaseId !== ph.id) return null;
+  const vid = player.getVideoData?.()?.video_id;
+  if (vid && vid !== ph.clip) { L('stale event ignored', { kind, vid }); return null; }
+  return ph;
+}
+
+function watchStart(ph) {
+  // If nothing is playing soon after, the browser most likely blocked sound.
+  setTimeout(() => {
+    if (S?.phase?.id !== ph.id || ph.failed || ph.gotPlaying || ph.paused) return;
+    L('autoplay blocked', { state: YT_STATE[player?.getPlayerState?.()] ?? null, hadGesture: hadGesture() });
+    if (!hadGesture()) showTap(); else markFailed('did not start playing');
+  }, 3000);
+}
+
+function loadInto(ph) {
+  // Reuse mode: one call swaps the clip, seeks and plays.
+  player.phaseId = ph.id;
+  try { player.loadVideoById({ videoId: ph.clip, startSeconds: ph.start }); L('load into existing player', { iframes: document.querySelectorAll('iframe').length }); }
+  catch (e) { markFailed('load threw'); return; }
+  watchStart(ph);
+}
+
+async function createPlayer() {
+  await ytLoaded;
+  const ph = S?.phase; if (!ph) return;
+  const el = document.createElement('div');
+  $('slot').replaceChildren(el);
+  const vars = { autoplay: 1, controls: 0, rel: 0, playsinline: 1, modestbranding: 1, origin: location.origin };
+  if (S.cfg.method === 'playerVar') vars.start = ph.start;
+  const p = player = new YT.Player(el, {
+    videoId: ph.clip, width: '100%', height: '100%', playerVars: vars,
+    events: {
+      onReady: () => {
+        p.ready = true;
+        const ph = S?.phase;
+        if (!ph || p !== player) return;
+        L('yt ready');
+        // Reuse mode: the phase may have moved on while the first player was loading.
+        if (p.phaseId !== ph.id) return loadInto(ph);
+        if (S.cfg.method === 'seekTo') { try { p.seekTo(ph.start, true); L('seek', { to: ph.start }); } catch (e) { markFailed('seek threw'); } }
+        try { p.playVideo(); } catch {}
+        watchStart(ph);
+      },
+      onStateChange: ev => {
+        const ph = eventPhase('state'); if (!ph) return;
+        const id = ph.id;
+        L('state', { state: YT_STATE[ev.data] ?? ev.data, at: round(player.getCurrentTime?.()) });
+        if (ev.data === 1 && !ph.gotPlaying) {
+          ph.gotPlaying = true; $('tapOv').classList.remove('on'); $('video').classList.remove('tap');
+          setTimeout(() => {
+            if (S?.phase?.id !== id) return;
+            const elapsed = (ph.dur * 1000 - ph.remaining) / 1000;
+            L('position check', { current: round(player.getCurrentTime()), expected: round(ph.startShift ?? ph.start), elapsedInPhase: round(elapsed) });
+          }, 1200);
+        }
+        if (ev.data === 0) L('clip ended on its own; phase continues');
+      },
+      onError: ev => { const ph = eventPhase('error'); if (ph) { L('yt error', { code: ev.data }); markFailed(`YouTube error ${ev.data}`); } },
+      onAutoplayBlocked: () => { if (eventPhase('autoplay')) L('yt onAutoplayBlocked'); },
+    },
+  });
+  p.phaseId = ph.id;
+  L('player created', { iframes: document.querySelectorAll('iframe').length });
+}
+
+function teardownPlayer() {
+  if (!player) return;
+  try { player.pauseVideo(); } catch {}
+  try { player.destroy(); } catch {}
+  player = null;
+  $('slot').replaceChildren();
+  $('tapOv').classList.remove('on'); $('video').classList.remove('tap');
+  L('player destroyed', { iframesLeft: document.querySelectorAll('iframe').length });
+}
+
+function markFailed(why) {
+  const ph = S?.phase; if (!ph || ph.failed) return;
+  ph.failed = true;
+  $('failWhy').textContent = why; $('failOv').classList.add('on'); $('video').classList.add('failed');
+  L('clip failed', { why });
+}
+
+function showTap() { $('tapOv').classList.add('on'); $('video').classList.add('tap'); L('tap prompt shown'); }
+
+$('tapOv').addEventListener('click', async () => {
+  const ph = S?.phase; if (!ph) return;
+  L('tap');
+  try { await document.documentElement.requestFullscreen(); L('fullscreen ok'); } catch (e) { L('fullscreen failed', { err: String(e) }); }
+  try { await navigator.wakeLock?.request('screen'); L(navigator.wakeLock ? 'wake lock ok' : 'wake lock unsupported'); } catch (e) { L('wake lock failed', { err: String(e) }); }
+  $('tapOv').classList.remove('on'); $('video').classList.remove('tap');
+  // One catch-up seek into the remaining window.
+  const elapsed = (ph.dur * 1000 - ph.remaining) / 1000;
+  ph.startShift = ph.start + elapsed;
+  try { player.seekTo(ph.startShift, true); player.playVideo(); L('catch-up seek', { to: round(ph.startShift) }); }
+  catch { markFailed('catch-up seek failed'); }
+});
+
+const round = x => (typeof x === 'number' ? Math.round(x * 10) / 10 : null);
+
+// ---------- wiring ----------
+$('startBtn').onclick = () => start(readForm());
+$('pauseBtn').onclick = pauseResume;
+$('skipBtn').onclick = () => S?.phase && complete(S.phase.id, 'skip');
+$('stopBtn').onclick = stop;
+$('markBtn').onclick = () => L('MARK');
+$('logBtn').onclick = () => $('log').classList.toggle('on');
+$('saveCfg').onclick = async () => {
+  try { await fetch('/config', { method: 'POST', body: JSON.stringify(readForm()) }); $('cfgMsg').textContent = 'Saved. The TV will load this.'; }
+  catch { $('cfgMsg').textContent = 'Save failed.'; }
+};
+addEventListener('keydown', e => {
+  if (!S || e.target.matches('input, textarea, select')) return;
+  if (e.key === ' ') { e.preventDefault(); pauseResume(); }
+  if (e.key === 'ArrowRight') complete(S.phase?.id, 'skip');
+  if (e.key === 'Escape') stop();
+  if (e.key === 'l') $('log').classList.toggle('on');
+});
+
+(async () => {
+  const tv = new URLSearchParams(location.search).get('tv');
+  let cfg = {};
+  try { cfg = await (await fetch('/config')).json(); } catch {}
+  fillForm(cfg);
+  if (tv === 'auto') {
+    $('startBtn').textContent = 'Starting in 10 s';
+    setTimeout(() => start(readForm()), 10000);
+  }
+})();
+</script>
+<script src="https://www.youtube.com/iframe_api"></script>
+</body>
+</html>
