@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Kettlebell probe</title>
+<style>
+  html, body { margin: 0; background: #08090B; color: #F2F4F7; }
+  body { font: 32px/1.4 Arial, sans-serif; padding: 32px; }
+  h1 { font-size: 48px; margin: 0 0 16px; }
+  pre { font: 28px/1.45 Consolas, monospace; white-space: pre-wrap; margin: 0; }
+  button { font-size: 32px; padding: 16px 24px; margin: 20px 16px 0 0; }
+  #err { color: #FF3DCB; white-space: pre-wrap; margin-top: 16px; }
+  iframe { display: block; width: 640px; height: 360px; margin-top: 20px; border: 0; }
+</style>
+</head>
+<body>
+<h1>Probe</h1>
+<pre id="out">starting</pre>
+<div id="err"></div>
+<button id="fs" type="button">Test fullscreen</button>
+<button id="sound" type="button">Test sound after a press</button>
+<div id="yt"></div>
+<script>
+window.onerror = function (msg, src, line) {
+  var el = document.getElementById("err");
+  el.appendChild(document.createTextNode(String(msg) + " (line " + line + ")\n"));
+};
+
+var lines = [];
+function add(line) {
+  lines.push(line);
+  document.getElementById("out").textContent = lines.join("\n");
+}
+
+add("userAgent: " + navigator.userAgent);
+add("secureContext: " + String(window.isSecureContext));
+add("viewport: " + window.innerWidth + "x" + window.innerHeight);
+add("origin: " + location.origin);
+
+var root = document.documentElement;
+var fsApi = "";
+if (root.requestFullscreen) fsApi = "api";
+else if (root.webkitRequestFullscreen) fsApi = "api (webkit)";
+else fsApi = "none";
+add("fullscreen: " + fsApi);
+
+if (!navigator.wakeLock) {
+  add("wakeLock: false");
+} else {
+  try {
+    var req = navigator.wakeLock.request("screen");
+    if (req && req.then) {
+      req.then(function (sentinel) {
+        add("wakeLock: true");
+        if (sentinel && sentinel.release) sentinel.release();
+      }, function (err) {
+        add("wakeLock: false (" + err + ")");
+      });
+    } else {
+      add("wakeLock: false (request returned nothing)");
+    }
+  } catch (err) {
+    add("wakeLock: false (" + err + ")");
+  }
+}
+
+function mountClip(autoplay) {
+  var holder = document.getElementById("yt");
+  holder.innerHTML = "";
+  var frame = document.createElement("iframe");
+  frame.width = "640";
+  frame.height = "360";
+  frame.setAttribute("allow", "autoplay; fullscreen");
+  frame.src = "https://www.youtube-nocookie.com/embed/bDCeXbMJVNs?start=34&autoplay=" + (autoplay ? "1" : "0") + "&rel=0";
+  holder.appendChild(frame);
+}
+
+document.getElementById("fs").onclick = function () {
+  var call = root.requestFullscreen || root.webkitRequestFullscreen;
+  if (!call) {
+    add("fullscreen call: none");
+    return;
+  }
+  try {
+    var result = call.call(root);
+    if (result && result.then) {
+      result.then(function () {
+        add("fullscreen call: ok");
+      }, function (err) {
+        add("fullscreen call: failed (" + err + ")");
+      });
+    } else {
+      add("fullscreen call: returned");
+    }
+  } catch (err) {
+    add("fullscreen call: failed (" + err + ")");
+  }
+};
+
+document.getElementById("sound").onclick = function () {
+  add("sound: pressed");
+  mountClip(true);
+};
+
+add("---");
+add("Sound, before any press: a clip is about to load on its own.");
+add("If you hear it, a per-site sound setting can work (site-setting).");
+add("If it stays silent, press Test sound. Hearing it then means press-on-ready.");
+mountClip(true);
+</script>
+</body>
+</html>

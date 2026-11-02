@@ -56,7 +56,7 @@ These are binding unless the owner overrides them before phase 1.
 - The intro uses the first circuit’s rest length and the first slot’s how-to start and stop times. It is not a second kind of timer.
 - On the last work interval of the last pass, Up next reads Finish.
 - Start needs a fresh heartbeat from a player on Ready. Otherwise the server refuses it with a reason the editor shows word for word (see Editor page).
-- One TV, one session, one active player. The most recently loaded `/player` is the active one. An older `/player` that learns it is not active stops polling and shows Ready.
+- One TV, one session, one active player. The most recently loaded `/player` is the active one. An older `/player` that learns it is not active destroys its YouTube player, stops polling, and shows Ready. It does not clear the session.
 - Two pages, one process, one SQLite file. `/editor` is used from a computer browser. `/player` is the TV page. There is no native app, no Lovelace card, and no second server.
 - A circuit always has at least one slot. Saving a circuit with no slots is refused.
 - Deleting an exercise lists the circuits that lose it, any circuit deleted because it would be empty, every workout whose blocks merge (with before and after sequences), and any workout deleted because it would be empty. Confirm removes every slot that points at it. Other slots, their work times, and the rest stay. Exercise slots are not merged. Swing at 30 seconds and swing at 30 seconds stay two slots. Cancel changes nothing.
@@ -169,7 +169,7 @@ The command row holds: seq (server-assigned, increasing), kind, created at (serv
 - The heartbeat holds: player instance id, run id, status (`ready`, `running`, `finished`), paused, current phase id, last applied seq, sound blocked. The server stamps it with its own receive time. It is fresh when that time is at most 5 seconds old. The TV's clock is never used for freshness.
 - A `current_run` record holds the run id, workout name, and block sequence of the session on the TV. Start sets it; stop and done clear it. The editor reads it to show the running workout after a reload.
 - A player whose run id differs from `current_run` drops its snapshot, destroys its YouTube player, and returns to Ready.
-- The server records the instance id of the newest player to send its first heartbeat as the active one. Every poll response includes `active: true/false`. A player told it is not active stops polling and shows Ready.
+- The server records the instance id of the newest player to send its first heartbeat as the active one. Every poll response includes `active: true/false`. A player told it is not active destroys its YouTube player, stops polling, and shows Ready. It does not clear the session.
 - The player checks the snapshot as a guard: if it has no passes or a pass has no slots, the player acknowledges the start, stays on Ready, and logs it.
 - Start refusal reasons, word for word: “The TV isn't connected.”, “The TV isn't on Ready.”, “This workout has no blocks.”, “Circuit <name> has no slots.”
 - The clock between polls is local. A failed poll does not freeze the clock and does not change phase.
@@ -180,7 +180,7 @@ Closing `/player` stops the clock. Nothing in the database keeps advancing phase
 
 - Work phase length is that slot’s work time. Rest uses the rest of the circuit being previewed. Intro uses the first circuit’s rest. None of these is the length of the YouTube video.
 - The clock uses `performance.now()`. When the clock completes a phase, the next phase’s end time is the previous end time plus its duration. On a skip, the next end time is now plus its duration. If a tick runs 1 second or more late (a frozen or throttled tab), the next phase starts from now instead, and the delay is logged. At most one phase completes per tick.
-- On pause, store the remaining time and disarm. On resume, arm a new end time from the stored remaining time. Display remaining time from the local end time.
+- On pause, store the remaining time and disarm. On resume, arm a new end time from the stored remaining time. Display remaining time from the local end time. If YouTube reports PLAYING while the phase is paused, pause the video again.
 - One YouTube IFrame player exists for the whole session. Create it when the session starts with `disablekb: 1`, `controls: 0`, `rel: 0`, `playsinline: 1`, and set the iframe’s `tabindex` to -1. On each phase entry, load that phase’s clip with one call: `loadVideoById` with `startSeconds`, plus `endSeconds` for a how-to; `cueVideoById` instead when the phase enters paused. That call replaces whatever clip is there, including one that failed or ended. Destroy the player on stop and on finished. Two clips must never be audible at once.
 - Each load gets a load token (the phase id). The player accepts YouTube events for a load only after the first UNSTARTED, BUFFERING, or CUED event that follows it, and only when the video id matches. Earlier events belong to the previous clip and are ignored.
 - The page enforces a how-to’s stop time itself: every 250 ms during a how-to it checks `getCurrentTime()` against the stop time. `endSeconds` is a backup.
@@ -276,7 +276,7 @@ Each row is a required behavior and a test. Automated tests use no network and n
 | 40 | Load time | Over 10 passes of fixture 1, the median time from phase start to PLAYING is under 3 s, and later passes are not slower than early ones. | TV. |
 | 41 | Remote keys during Work | Arrows, OK, and Back do not pause the video or move focus into the iframe. Back does not leave the page. | TV. |
 | 42 | Test play | A song known to refuse embedding is refused at save with the owner reason. A good clip saves. | Manual, in Phase 3. |
-| 43 | A second `/player` loads | The first is told it is not active, shows Ready, and stops polling. Only the second applies commands. | Automated. |
+| 43 | A second `/player` loads | The first is told it is not active, destroys its player, shows Ready, and stops polling. It does not clear the session. Only the second applies commands. | Automated. |
 | 44 | Snapshot guard | A start whose snapshot has no passes, or a pass with no slots, is acknowledged and the player stays on Ready. | Automated. |
 
 ## Hosting
